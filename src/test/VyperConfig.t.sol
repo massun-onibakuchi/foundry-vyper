@@ -5,14 +5,14 @@ import "forge-std/Test.sol";
 
 import {INumber} from "./interfaces/INumber.sol";
 import {IConstructor} from "./interfaces/IConstructor.sol";
-import {HuffConfig} from "../HuffConfig.sol";
+import {VyperConfig} from "../VyperConfig.sol";
 
-contract HuffConfigTest is Test {
-    HuffConfig public config;
+contract VyperConfigTest is Test {
+    VyperConfig public config;
     INumber public number;
 
     function setUp() public {
-        config = new HuffConfig();
+        config = new VyperConfig();
     }
 
     function testWithDeployer(address deployer) public {
@@ -30,17 +30,6 @@ contract HuffConfigTest is Test {
         assertEq(config.value(), value);
     }
 
-    function testWithCode(string memory code) public {
-        config.with_code(code);
-        assertEq(config.code(), code);
-    }
-
-    function testWithConstantOverrides(string memory key, string memory value) public {
-        config.with_constant(key, value);
-        (string memory k, string memory v) = config.const_overrides(0);
-        assertEq(key, k);
-        assertEq(value, v);
-    }
 
     function testSetBroadcast(bool broadcast) public {
         config.set_broadcast(broadcast);

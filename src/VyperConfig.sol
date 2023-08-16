@@ -4,20 +4,11 @@ pragma solidity >=0.8.13 <0.9.0;
 import {Vm} from "forge-std/Vm.sol";
 import {strings} from "stringutils/strings.sol";
 
-contract HuffConfig {
+contract VyperConfig {
     using strings for *;
 
-    /// @notice Initializes cheat codes in order to use ffi to compile Huff contracts
+    /// @notice Initializes cheat codes in order to use ffi to compile Vyper contracts
     Vm public constant vm = Vm(address(bytes20(uint160(uint256(keccak256("hevm cheat code"))))));
-
-    /// @notice Struct that represents a constant to be passed to the `-c` flag
-    struct Constant {
-        string key;
-        string value;
-    }
-
-    /// @notice additional code to append to the source file
-    string public code;
 
     /// @notice arguments to append to the bytecode
     bytes public args;
@@ -35,80 +26,45 @@ contract HuffConfig {
     /// @notice supported evm versions
     string public evm_version;
 
-    /// @notice constant overrides for the current compilation environment
-    Constant[] public const_overrides;
-
-    /// @notice sets the code to be appended to the source file
-    function with_code(string memory code_) public returns (HuffConfig) {
-        code = code_;
-        return this;
-    }
-
     /// @notice sets the arguments to be appended to the bytecode
-    function with_args(bytes memory args_) public returns (HuffConfig) {
+    function with_args(bytes memory args_) public returns (VyperConfig) {
         args = args_;
         return this;
     }
 
     /// @notice sets the amount of wei to deploy the contract with
-    function with_value(uint256 value_) public returns (HuffConfig) {
+    function with_value(uint256 value_) public returns (VyperConfig) {
         value = value_;
         return this;
     }
 
     /// @notice sets the caller of the next deployment
-    function with_deployer(address _deployer) public returns (HuffConfig) {
+    function with_deployer(address _deployer) public returns (VyperConfig) {
         deployer = _deployer;
         return this;
     }
 
     /// @notice sets the evm version to compile with
-    function with_evm_version(string memory _evm_version) public returns (HuffConfig) {
+    function with_evm_version(string memory _evm_version) public returns (VyperConfig) {
         evm_version = _evm_version;
         return this;
     }
 
-    /// @notice sets a constant to a bytes memory value in the current compilation environment
-    /// @dev The `value` string must contain a valid hex number that is <= 32 bytes
-    ///      i.e. "0x01", "0xa57b", "0x0de0b6b3a7640000", etc.
-    function with_constant(string memory key, string memory value_) public returns (HuffConfig) {
-        const_overrides.push(Constant(key, value_));
-        return this;
-    }
-
-    /// @notice sets a constant to an address value in the current compilation environment
-    function with_addr_constant(string memory key, address value_) public returns (HuffConfig) {
-        const_overrides.push(Constant(key, bytesToString(abi.encodePacked(value_))));
-        return this;
-    }
-
-    /// @notice sets a constant to a bytes32 value in the current compilation environment
-    function with_bytes32_constant(string memory key, bytes32 value_) public returns (HuffConfig) {
-        const_overrides.push(Constant(key, bytesToString(abi.encodePacked(value_))));
-        return this;
-    }
-
-    /// @notice sets a constant to a uint256 value in the current compilation environment
-    function with_uint_constant(string memory key, uint256 value_) public returns (HuffConfig) {
-        const_overrides.push(Constant(key, bytesToString(abi.encodePacked(value_))));
-        return this;
-    }
-
     /// @notice sets whether to broadcast the deployment
-    function set_broadcast(bool broadcast) public returns (HuffConfig) {
+    function set_broadcast(bool broadcast) public returns (VyperConfig) {
         should_broadcast = broadcast;
         return this;
     }
 
-    /// @notice Checks for huffc binary conflicts
-    function binary_check() public {
+    /// @notice Checks for vyper binary conflicts
+    function package_check() public {
         string[] memory bincheck = new string[](1);
-        bincheck[0] = "./lib/foundry-huff/scripts/binary_check.sh";
+        bincheck[0] = "./lib/foundry-vyper/scripts/package_check.sh";
         bytes memory retData = vm.ffi(bincheck);
         bytes8 first_bytes = retData[0];
         bool decoded = first_bytes == bytes8(hex"01");
         require(
-            decoded, "Invalid huffc binary. Run `curl -L get.huff.sh | bash` and `huffup` to fix."
+            decoded, "Invalid vyper. Run `pip install vyper` to fix."
         );
     }
 
@@ -144,7 +100,7 @@ contract HuffConfig {
 
     /// @notice Get the creation bytecode of a contract
     function creation_code(string memory file) public payable returns (bytes memory bytecode) {
-        binary_check();
+        package_check();
 
         // Split the file into its parts
         strings.slice memory s = file.toSlice();
@@ -156,7 +112,7 @@ contract HuffConfig {
 
         // Get the system time with our script
         string[] memory time = new string[](1);
-        time[0] = "./lib/foundry-huff/scripts/rand_bytes.sh";
+        time[0] = "./lib/foundry-vyper/scripts/rand_bytes.sh";
         bytes memory retData = vm.ffi(time);
         string memory rand_bytes = bytes32ToString(keccak256(abi.encode(bytes32(retData))));
 
@@ -171,47 +127,30 @@ contract HuffConfig {
             tempFile = string.concat(tempFile, "/", "__TEMP__", rand_bytes, parts[parts.length - 1]);
         }
 
-        // Paste the code in a new temp file
-        string[] memory create_cmds = new string[](3);
-        // TODO: create_cmds[0] = "$(find . -name \"file_writer.sh\")";
-        create_cmds[0] = "./lib/foundry-huff/scripts/file_writer.sh";
-        create_cmds[1] = string.concat("src/", tempFile, ".huff");
-        create_cmds[2] = string.concat(code, "\n");
-        vm.ffi(create_cmds);
-
         // Append the real code to the temp file
         string[] memory append_cmds = new string[](3);
-        append_cmds[0] = "./lib/foundry-huff/scripts/read_and_append.sh";
-        append_cmds[1] = string.concat("src/", tempFile, ".huff");
-        append_cmds[2] = string.concat("src/", file, ".huff");
+        append_cmds[0] = "./lib/foundry-vyper/scripts/read_and_append.sh";
+        append_cmds[1] = string.concat("src/", tempFile, ".vy");
+        append_cmds[2] = string.concat("src/", file, ".vy");
         vm.ffi(append_cmds);
 
-        /// Create a list of strings with the commands necessary to compile Huff contracts
-        string[] memory cmds = new string[](5);
-        if (const_overrides.length > 0) {
-            cmds = new string[](6 + const_overrides.length);
-            cmds[5] = "-c";
+        /// Create a list of strings with the commands necessary to compile Vyper contracts
+        string[] memory cmds = new string[](6);
 
-            Constant memory cur_const;
-            for (uint256 i; i < const_overrides.length; i++) {
-                cur_const = const_overrides[i];
-                cmds[6 + i] = string.concat(cur_const.key, "=", cur_const.value);
-            }
-        }
+        cmds[0] = "vyper";
+        cmds[1] = string(string.concat("src/", tempFile, ".vy"));
+        cmds[2] = "-f";
+        cmds[3] = "bytecode";
+        cmds[4] = "--evm-version";
+        cmds[5] = get_evm_version();
 
-        cmds[0] = "huffc";
-        cmds[1] = string(string.concat("src/", tempFile, ".huff"));
-        cmds[2] = "-b";
-        cmds[3] = "-e";
-        cmds[4] = get_evm_version();
-
-        /// @notice compile the Huff contract and return the bytecode
+        /// @notice compile the Vyper contract and return the bytecode
         bytecode = vm.ffi(cmds);
 
         // Clean up temp files
         string[] memory cleanup = new string[](2);
         cleanup[0] = "rm";
-        cleanup[1] = string.concat("src/", tempFile, ".huff");
+        cleanup[1] = string.concat("src/", tempFile, ".vy");
 
         // set `msg.sender` for upcoming create context
         vm.prank(deployer);
@@ -239,7 +178,7 @@ contract HuffConfig {
         }
 
         /// @notice check that the deployment was successful
-        require(deployedAddress != address(0), "HuffDeployer could not deploy contract");
+        require(deployedAddress != address(0), "VyperDeployer could not deploy contract");
 
         /// @notice return the address that the contract was deployed to
         return deployedAddress;
