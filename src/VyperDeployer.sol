@@ -17,18 +17,20 @@ library VyperDeployer {
 
     // @notice Get the address of a VyperConfig deployed with config_with_create_2
     function get_config_with_create_2(uint256 salt) public view returns (address) {
-        return 
-            address(
-                uint160(
-                    uint256(
-                        keccak256(
-                            abi.encodePacked(
-                                bytes1(0xff), address(this), bytes32(salt), keccak256(type(VyperConfig).creationCode)
-                            )
+        return address(
+            uint160(
+                uint256(
+                    keccak256(
+                        abi.encodePacked(
+                            bytes1(0xff),
+                            address(this),
+                            bytes32(salt),
+                            keccak256(type(VyperConfig).creationCode)
                         )
                     )
                 )
-            );
+            )
+        );
     }
 
     /// @notice Compiles a Vyper contract and returns the address that the contract was deployeod to
@@ -84,5 +86,12 @@ library VyperDeployer {
         returns (address)
     {
         return config().set_broadcast(true).with_args(args).deploy(fileName);
+    }
+
+    /// @notice Compiles a Vyper contract as blueprint and returns the address that the contract was deployeod to
+    /// @param fileName - The file name of the Vyper contract. For example, the file name for "SimpleStore.vy" is "SimpleStore"
+    /// @return The address that the contract was deployed to
+    function deploy_blueprint(string memory fileName) internal returns (address) {
+        return config().deploy_blueprint(fileName);
     }
 }

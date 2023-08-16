@@ -30,7 +30,6 @@ contract VyperConfigTest is Test {
         assertEq(config.value(), value);
     }
 
-
     function testSetBroadcast(bool broadcast) public {
         config.set_broadcast(broadcast);
         bool b = config.should_broadcast();

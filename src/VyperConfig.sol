@@ -63,15 +63,13 @@ contract VyperConfig {
         bytes memory retData = vm.ffi(bincheck);
         bytes8 first_bytes = retData[0];
         bool decoded = first_bytes == bytes8(hex"01");
-        require(
-            decoded, "Invalid vyper. Run `pip install vyper` to fix."
-        );
+        require(decoded, "Invalid vyper. Run `pip install vyper` to fix.");
     }
 
     function bytes32ToString(bytes32 x) internal pure returns (string memory) {
         string memory result;
         for (uint256 j = 0; j < x.length; j++) {
-            result = string.concat(result, string(abi.encodePacked(uint8(x[j]) % 26 + 97)));
+            result = string.concat(result, string(abi.encodePacked((uint8(x[j]) % 26) + 97)));
         }
         return result;
     }
@@ -99,7 +97,11 @@ contract VyperConfig {
     }
 
     /// @notice Get the creation bytecode of a contract
-    function creation_code(string memory file) public payable returns (bytes memory bytecode) {
+    function creation_code(string memory file, string memory code_format)
+        public
+        payable
+        returns (bytes memory bytecode)
+    {
         package_check();
 
         // Split the file into its parts
@@ -140,7 +142,7 @@ contract VyperConfig {
         cmds[0] = "vyper";
         cmds[1] = string(string.concat("src/", tempFile, ".vy"));
         cmds[2] = "-f";
-        cmds[3] = "bytecode";
+        cmds[3] = code_format;
         cmds[4] = "--evm-version";
         cmds[5] = get_evm_version();
 
@@ -155,12 +157,20 @@ contract VyperConfig {
         // set `msg.sender` for upcoming create context
         vm.prank(deployer);
 
-
         vm.ffi(cleanup);
     }
 
+    /// @notice Get the creation bytecode of a contract
+    function creation_code(string memory file) public payable returns (bytes memory bytecode) {
+        bytecode = creation_code(file, "bytecode");
+    }
+
     /// @notice get creation code of a contract plus encoded arguments
-    function creation_code_with_args(string memory file) public payable returns (bytes memory bytecode) {
+    function creation_code_with_args(string memory file)
+        public
+        payable
+        returns (bytes memory bytecode)
+    {
         bytecode = creation_code(file);
         return bytes.concat(bytecode, args);
     }
@@ -175,6 +185,25 @@ contract VyperConfig {
         assembly {
             let val := sload(value.slot)
             deployedAddress := create(val, add(concatenated, 0x20), mload(concatenated))
+        }
+
+        /// @notice check that the deployment was successful
+        require(deployedAddress != address(0), "VyperDeployer could not deploy contract");
+
+        /// @notice return the address that the contract was deployed to
+        return deployedAddress;
+    }
+
+    /// @notice Deploy the Contract
+    function deploy_blueprint(string memory file) public payable returns (address) {
+        bytes memory bytecode_blueprint = creation_code(file, "blueprint_bytecode");
+
+        /// @notice deploy the bytecode with the create instruction
+        address deployedAddress;
+        if (should_broadcast) vm.broadcast();
+        assembly {
+            let val := sload(value.slot)
+            deployedAddress := create(val, add(bytecode_blueprint, 0x20), mload(bytecode_blueprint))
         }
 
         /// @notice check that the deployment was successful

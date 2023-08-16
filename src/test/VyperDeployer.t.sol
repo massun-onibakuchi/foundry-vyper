@@ -23,10 +23,7 @@ contract VyperDeployerTest is Test {
         structor = IConstructor(
             VyperDeployer.deploy_with_args(
                 "test/contracts/Constructor",
-                bytes.concat(
-                    abi.encode(address(0x420)),
-                    abi.encode(uint256(0x420))
-                )
+                bytes.concat(abi.encode(address(0x420)), abi.encode(uint256(0x420)))
             )
         );
         Vm.Log[] memory entries = vm.getRecordedLogs();
@@ -34,13 +31,9 @@ contract VyperDeployerTest is Test {
         assertEq(entries.length, 1);
         assertEq(entries[0].topics.length, 3);
         assertEq(
-            entries[0].topics[0],
-            bytes32(uint256(keccak256("ArgumentsUpdated(address,uint256)")))
+            entries[0].topics[0], bytes32(uint256(keccak256("ArgumentsUpdated(address,uint256)")))
         );
-        assertEq(
-            entries[0].topics[1],
-            bytes32(uint256(uint160(address(0x420))))
-        );
+        assertEq(entries[0].topics[1], bytes32(uint256(uint160(address(0x420)))));
         assertEq(entries[0].topics[2], bytes32(uint256(0x420)));
     }
 
@@ -87,10 +80,7 @@ contract VyperDeployerTest is Test {
             // by using o_code = new bytes(size)
             o_code := mload(0x40)
             // new "memory end" including padding
-            mstore(
-                0x40,
-                add(o_code, and(add(add(size, 0x20), 0x1f), not(0x1f)))
-            )
+            mstore(0x40, add(o_code, and(add(add(size, 0x20), 0x1f), not(0x1f))))
             // store length in memory
             mstore(o_code, size)
             // actually retrieve the code, this needs assembly
